@@ -1,7 +1,9 @@
 import express from 'express'
 import 'dotenv/config'
 import TelegramBot from 'node-telegram-bot-api'
+import UserService from './model.service'
 
+const userService = new UserService()
 const app = express()
 const TOKEN = process.env.TELEGRAM_TOKEN
 const bot = new TelegramBot(TOKEN)
@@ -23,11 +25,9 @@ app.listen(port, () => {
 bot.on('message', async (msg) => {
     const text = msg.text
     const chatId = msg.chat.id
-    let randomNumber
-    await bot.sendMessage(chatId, 'Hello, i`m alive')
+    const user = await userService.createUser({chatId, username: msg.chat.first_name})
     if (text === '/start') {
-        randomNumber = Math.ceil(Math.random() * 10)
-        console.log(randomNumber)
+        await userService.updateUserModel({chatId})
         await bot.sendMessage(chatId, 'Try to guess number', {
             reply_markup: {
                 inline_keyboard: [
@@ -51,10 +51,16 @@ bot.on('message', async (msg) => {
             },
         })
         bot.on('callback_query', async (msg) => {
-            if (randomNumber == msg.data) {
-                return bot.sendMessage(chatId, 'Congratulations, you are win')
+            const random = await userService.findGame(msg.message.chat.id)
+            if(random === Number(msg.data)){
+                return bot.sendMessage(chatId, 'Congratulation, you win')
             }
-            return bot.sendMessage(chatId, 'Nummber is not correct')
+            else{
+                return bot.sendMessage(chatId, 'Try again')
+            }
         })
+    }
+    if(text === '/info'){
+        await bot.sendMessage(chatId, `Hello ${user.username}, your id is ${user.id}, your last game random number was ${user.randomNumber}`)
     }
 })
